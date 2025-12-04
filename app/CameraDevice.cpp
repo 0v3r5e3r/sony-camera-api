@@ -279,7 +279,7 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
     }
     m_spontaneous_disconnection = false;
 
-    fprintf(stdout, "[DEBUG] Connecting with password '%s'\n",m_userPassword);
+    fprintf(stdout, "[DEBUG] Connecting with password '%s'\n",m_userPassword.c_str());
 
     if(m_info->GetModel() == "fake camera")
         return true;    // Lie and say we connected for real :D
