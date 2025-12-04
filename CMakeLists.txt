@@ -26,6 +26,9 @@ add_executable(${camera_rest_api}
     ${crsdk_hdrs}
 )
 
+### PERMIT FAKE CAMERA -- REMOVE FOR PRODUCTION
+target_compile_options( ${camera_rest_api} PRIVATE -DWITH_FAKE_CAMERA )
+
 if(APPLE)
     set_target_properties(${camera_rest_api} PROPERTIES
         CXX_STANDARD 17

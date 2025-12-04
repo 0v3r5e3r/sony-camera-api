@@ -47,6 +47,8 @@ namespace fs = std::filesystem;
 #endif
 
 
+#include <iostream> // remove later
+
 // Enumerator
 enum Password_Key {
 
@@ -133,6 +135,52 @@ CameraDevice::~CameraDevice()
     if (m_info) m_info->Release();
 }
 
+CameraDevice::CameraDevice(std::int32_t no, bool isFake)
+    : m_number(no)
+    , m_device_handle(0)
+    , m_connected(false)
+    , m_conn_type(ConnectionType::UNKNOWN)
+    , m_prop()
+    , m_lvEnbSet(true)
+    , m_modeSDK(SCRSDK::CrSdkControlMode_Remote)
+    , m_spontaneous_disconnection(false)
+    , m_fingerprint("")
+    , m_userPassword("")
+    , m_bodySerialNumberProp(nullptr)
+    , m_lensModelNameProp(nullptr)
+    , m_recordingSettingFileNameProp(nullptr)
+    , m_modelNameProp(nullptr)
+    , m_media_formatComplete(false)
+    , m_getContentsDataMovieFlg(false)
+    , m_getContentsDataStartFlg(false)
+    , m_getContentsData_notify(0)
+    , m_getContentsData_per(0)
+    , m_latestFirmwareUploadRate(0)
+{
+    if(isFake == false)
+        CameraDevice::~CameraDevice();
+
+    m_info = SDK::CreateCameraObjectInfo(
+       (CrChar*)"fake_camera",
+        (CrChar*)"fake camera",
+        0,
+        0,
+        0,
+        0,
+        (CrChar*)"fake",
+        (CrChar*)"adapted",
+        (CrChar*)"0",
+        1
+    );
+
+    m_conn_type = ConnectionType::UNKNOWN;
+
+    m_captureDateList[0] = nullptr;
+    m_captureDateList[1] = nullptr;
+    m_contentsInfoList[0] = nullptr;
+    m_contentsInfoList[1] = nullptr;
+}
+
 bool CameraDevice::getfingerprint()
 {
     CrInt32u fpLen = 0;
@@ -152,9 +200,9 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
     m_modeSDK = openMode;
     const char* inputId = "admin";
     char inputPassword[32] = { 0 };
-    if (SDK::CrSSHsupportValue::CrSSHsupport_ON == get_sshsupport())
+    if (SDK::CrSSHsupportValue::CrSSHsupport_ON == get_sshsupport() || m_info->GetModel() == "fake camera")
     {
-        if (!is_getfingerprint())
+        if (!is_getfingerprint() && m_info->GetModel() != "fake camera")
         {
             bool resFp = getfingerprint();
             if (resFp)
@@ -227,12 +275,16 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
             strncpy(inputPassword, (const char*)userPw.c_str(), userPw.size());
 #endif
             m_userPassword = std::string(inputPassword, userPw.size());
-
         }
     }
-
     m_spontaneous_disconnection = false;
-    auto connect_status = SDK::Connect(m_info, this, &m_device_handle, openMode, reconnect, inputId, m_userPassword.c_str(), m_fingerprint.c_str(), (CrInt32u)m_fingerprint.size());
+
+    fprintf(stdout, "[DEBUG] Connecting with password '%s'\n",m_userPassword);
+
+    if(m_info->GetModel() == "fake camera")
+        return true;    // Lie and say we connected for real :D
+    
+        auto connect_status = SDK::Connect(m_info, this, &m_device_handle, openMode, reconnect, inputId, m_userPassword.c_str(), m_fingerprint.c_str(), (CrInt32u)m_fingerprint.size());
     if (CR_FAILED(connect_status)) {
         text id(this->get_id());
         tout << std::endl << "Failed to connect: 0x" << std::hex << connect_status << std::dec << ". " << m_info->GetModel() << " (" << id.data() << ")\n";
@@ -243,10 +295,18 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
     return true;
 }
 
+void CameraDevice::set_userpassword(std::string pword){
+    m_userPassword = pword;
+}
+
 bool CameraDevice::disconnect()
 {
     // m_fingerprint.clear();  // Use as needed
     // m_userPassword.clear(); // Use as needed
+
+    if(m_info->GetModel() == "fake camera")
+        return true;
+
     m_spontaneous_disconnection = true;
     tout << "Disconnect from camera...\n";
     auto disconnect_status = SDK::Disconnect(m_device_handle);
@@ -260,6 +320,12 @@ bool CameraDevice::disconnect()
 bool CameraDevice::release()
 {
     tout << "Release camera...\n";
+
+    if(m_info->GetModel() == "fake camera"){
+        m_device_handle = 0;
+        return true;
+    }
+
     auto finalize_status = SDK::ReleaseDevice(m_device_handle);
     m_device_handle = 0; // clear
     if (CR_FAILED(finalize_status)) {
@@ -286,12 +352,15 @@ void CameraDevice::capture_image() const
 {
     tout << "Capture image...\n";
     tout << "Shutter down\n";
-    SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Down);
+    
+    if(m_info->GetModel() != "fake camera")
+        SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Down);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(35ms);
     tout << "Shutter up\n";
-    SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Up);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Up);
 }
 
 void CameraDevice::s1_shooting() const
@@ -310,13 +379,15 @@ void CameraDevice::s1_shooting() const
     prop.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_S1);
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Locked);
     prop.SetValueType(SDK::CrDataType::CrDataType_UInt16);
-    SDK::SetDeviceProperty(m_device_handle, &prop);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SetDeviceProperty(m_device_handle, &prop);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(1s);
     tout << "Shutter Half Press up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
-    SDK::SetDeviceProperty(m_device_handle, &prop);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SetDeviceProperty(m_device_handle, &prop);
 }
 
 void CameraDevice::af_shutter() const
@@ -335,23 +406,27 @@ void CameraDevice::af_shutter() const
     prop.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_S1);
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Locked);
     prop.SetValueType(SDK::CrDataType::CrDataType_UInt16);
-    SDK::SetDeviceProperty(m_device_handle, &prop);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SetDeviceProperty(m_device_handle, &prop);
 
     // Wait, then send shutter down
     std::this_thread::sleep_for(500ms);
     tout << "Shutter down\n";
-    SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Down);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Down);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(35ms);
     tout << "Shutter up\n";
-    SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Up);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Up);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(1s);
     tout << "Shutter Half Press up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
-    SDK::SetDeviceProperty(m_device_handle, &prop);
+    if(m_info->GetModel() != "fake camera")
+        SDK::SetDeviceProperty(m_device_handle, &prop);
 }
 
 void CameraDevice::continuous_shooting()
@@ -364,13 +439,18 @@ void CameraDevice::continuous_shooting()
         priority.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_PriorityKeySettings);
         priority.SetCurrentValue(SDK::CrPriorityKeySettings::CrPriorityKey_PCRemote);
         priority.SetValueType(SDK::CrDataType::CrDataType_UInt32Array);
-        auto err_priority = SDK::SetDeviceProperty(m_device_handle, &priority);
-        if (CR_FAILED(err_priority)) {
-            tout << "Priority Key setting FAILED\n";
-            return;
+        if(m_info->GetModel() != "fake camera")
+        {
+            auto err_priority = SDK::SetDeviceProperty(m_device_handle, &priority);
+            if (CR_FAILED(err_priority)) {
+                tout << "Priority Key setting FAILED\n";
+                return;
+            }
         }
+        
         std::this_thread::sleep_for(500ms);
-        get_position_key_setting();
+        if(m_info->GetModel() != "fake camera")
+            get_position_key_setting();
     }
 
     // Set, still_capture_mode property
@@ -379,6 +459,18 @@ void CameraDevice::continuous_shooting()
         tout << "Still Capture Mode setting is not supported.\n";
         return;
     }
+    if(m_info->GetModel() != "fake camera")
+    {
+        // no longer take the actual steps
+        tout << "Still Capture Mode setting SUCCESS\n";
+        tout << "Capture image...\n";
+        tout << "Shutter down\n";
+        // Wait, then send shutter up
+        std::this_thread::sleep_for(500ms);
+        tout << "Shutter up\n";
+        return;
+    }
+
     auto& values = m_prop.still_capture_mode.possible;
     mode.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_DriveMode);
     if (find(values.begin(), values.end(), SDK::CrDriveMode::CrDrive_Continuous_Hi_Plus) != values.end()) {
@@ -425,25 +517,48 @@ void CameraDevice::continuous_shooting()
 
 void CameraDevice::get_aperture()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << format_f_number(0xFFFE) << '\n';
+        return;
+    }
+
     load_properties();
     tout << format_f_number(m_prop.f_number.current) << '\n';
 }
 
 void CameraDevice::get_iso()
 {
-    load_properties();
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "ISO: " << format_iso_sensitivity(0xFFFFFF) << '\n';
+        return;
+    }
 
+    load_properties();
     tout << "ISO: " << format_iso_sensitivity(m_prop.iso_sensitivity.current) << '\n';
 }
 
 void CameraDevice::get_shutter_speed()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Shutter Speed: " << format_shutter_speed(0xFFFFFFFF) << '\n';
+        return;
+    }
+
     load_properties();
     tout << "Shutter Speed: " << format_shutter_speed(m_prop.shutter_speed.current) << '\n';
 }
 
 bool CameraDevice::get_extended_shutter_speed()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Extended Shutter Speed is not supported.\n";
+        return true;
+    }
+
     load_properties();
     if (-1 == m_prop.extended_shutter_speed.writable) {
         tout << "Extended Shutter Speed is not supported.\n";
@@ -455,24 +570,48 @@ bool CameraDevice::get_extended_shutter_speed()
 
 void CameraDevice::get_position_key_setting()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Position Key Setting: Unknown\n";
+        return;
+    }
+
     load_properties();
     tout << "Position Key Setting: " << format_position_key_setting(m_prop.position_key_setting.current) << '\n';
 }
 
 void CameraDevice::get_exposure_program_mode()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Exposure Program Mode: " << format_exposure_program_mode(0x00008000) << '\n';
+        return;
+    }
+
     load_properties();
     tout << "Exposure Program Mode: " << format_exposure_program_mode(m_prop.exposure_program_mode.current) << '\n';
 }
 
 void CameraDevice::get_still_capture_mode()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Still Capture Mode: Enabled\n";
+        return;
+    }
+
     load_properties();
     tout << "Still Capture Mode: " << format_still_capture_mode(m_prop.still_capture_mode.current) << '\n';
 }
 
 void CameraDevice::get_focus_mode()
 {
+    if(m_info->GetModel() == "fake camera")
+    {
+        tout << "Focus Mode: " << format_focus_mode(0x0001) << '\n';
+        return;
+    }
+
     load_properties();
     tout << "Focus Mode: " << format_focus_mode(m_prop.focus_mode.current) << '\n';
 }

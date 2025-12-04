@@ -116,6 +116,11 @@ void API::stop()
     m_cameras.clear();
     m_running = false;
 }
+void API::enable_fake_camera(void)
+{
+    m_fakecam = true;
+}
+
 std::string API::handle_connect_camera(const std::string& ip, const std::string& password)
 {
     std::lock_guard<std::mutex> lock(m_cameras_mutex);
@@ -137,7 +142,40 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
             ipAddr += (std::stoi(seg) << (8 * cntSeg++));
         }
     }
-    
+
+    if (ip == "192.0.2.123" && m_fakecam)
+    {
+        // you already know it's the fake cam, don't worry about connecting for real.
+
+        // Check if already connected
+        CameraInfo* info = find_camera_by_serial("46:41:4B:49:4E:47");
+        if(!info){
+            // create a fake camera
+            auto fakecam = std::make_shared<cli::CameraDevice>(1,true);
+            if(password != "")
+            {
+                fakecam->set_userpassword(password);
+            }
+            fakecam->connect(
+                SCRSDK::CrSdkControlMode_Remote,
+                SCRSDK::CrReconnecting_ON
+            );
+            info->serial = "46:41:4B:49:4E:47";
+            info->ip = "192.0.2.123";
+            info->model = "fake camera";
+            info->recording_state = RecordingState::NOT_RECORDING;
+            info->device = fakecam;
+            m_cameras["46:41:4B:49:4E:47"] = *info;
+        }
+        json response = {
+            {"serial",info->serial},
+            {"ip",info->ip},
+            {"model",info->model},
+            {"recording",RecordingState::NOT_RECORDING}
+        };
+        return response.dump();
+    }
+
     // Dummy MAC address
     CrInt8u macAddr[6] = {0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC};
     
@@ -154,6 +192,10 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
     
     // Create camera device and connect
     auto camera_device = std::make_shared<cli::CameraDevice>(1, pCam);
+    if(password != "")
+    {
+        camera_device->set_userpassword(password);
+    }
     bool connect_result = camera_device->connect(
         SCRSDK::CrSdkControlMode_Remote,
         SCRSDK::CrReconnecting_ON
@@ -179,7 +221,7 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
     info.device = camera_device;
     
     m_cameras[serial] = info;
-    
+
     // Return camera info as JSON
     json response = {
         {"serial", serial},
@@ -194,7 +236,6 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
 std::string API::handle_get_cameras()
 {
     std::lock_guard<std::mutex> lock(m_cameras_mutex);
-
     json cameras_array = json::array();
 
     for (const auto& pair : m_cameras) {
