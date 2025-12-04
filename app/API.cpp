@@ -160,6 +160,7 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
                 SCRSDK::CrSdkControlMode_Remote,
                 SCRSDK::CrReconnecting_ON
             );
+            info = new CameraInfo();
             info->serial = "46:41:4B:49:4E:47";
             info->ip = "192.0.2.123";
             info->model = "fake camera";
@@ -181,7 +182,7 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
     
     // Create camera object via direct IP connection
     SCRSDK::ICrCameraObjectInfo* pCam = nullptr;
-    SCRSDK::CrCameraDeviceModelList model = SCRSDK::CrCameraDeviceModelList::CrCameraDeviceModel_ILME_FX6;
+    SCRSDK::CrCameraDeviceModelList model = SCRSDK::CrCameraDeviceModelList::CrCameraDeviceModel_HXR_NX800;
     CrInt32u sshSupport = 0; // No SSH
     
     auto err = SCRSDK::CreateCameraObjectInfoEthernetConnection(&pCam, model, ipAddr, macAddr, sshSupport);

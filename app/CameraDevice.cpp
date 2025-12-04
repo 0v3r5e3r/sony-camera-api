@@ -200,9 +200,9 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
     m_modeSDK = openMode;
     const char* inputId = "admin";
     char inputPassword[32] = { 0 };
-    if (SDK::CrSSHsupportValue::CrSSHsupport_ON == get_sshsupport() || m_info->GetModel() == "fake camera")
+    if (SDK::CrSSHsupportValue::CrSSHsupport_ON == get_sshsupport() || std::string(m_info->GetModel()) == "fake camera")
     {
-        if (!is_getfingerprint() && m_info->GetModel() != "fake camera")
+        if (!is_getfingerprint() && std::string(m_info->GetModel()) != "fake camera")
         {
             bool resFp = getfingerprint();
             if (resFp)
@@ -280,11 +280,14 @@ bool CameraDevice::connect(SCRSDK::CrSdkControlMode openMode, SCRSDK::CrReconnec
     m_spontaneous_disconnection = false;
 
     fprintf(stdout, "[DEBUG] Connecting with password '%s'\n",m_userPassword.c_str());
-
-    if(m_info->GetModel() == "fake camera")
-        return true;    // Lie and say we connected for real :D
     
-        auto connect_status = SDK::Connect(m_info, this, &m_device_handle, openMode, reconnect, inputId, m_userPassword.c_str(), m_fingerprint.c_str(), (CrInt32u)m_fingerprint.size());
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        set_save_info();
+        return true;    // Lie and say we connected for real :D
+    }
+    
+    auto connect_status = SDK::Connect(m_info, this, &m_device_handle, openMode, reconnect, inputId, m_userPassword.c_str(), m_fingerprint.c_str(), (CrInt32u)m_fingerprint.size());
     if (CR_FAILED(connect_status)) {
         text id(this->get_id());
         tout << std::endl << "Failed to connect: 0x" << std::hex << connect_status << std::dec << ". " << m_info->GetModel() << " (" << id.data() << ")\n";
@@ -304,7 +307,7 @@ bool CameraDevice::disconnect()
     // m_fingerprint.clear();  // Use as needed
     // m_userPassword.clear(); // Use as needed
 
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
         return true;
 
     m_spontaneous_disconnection = true;
@@ -321,7 +324,7 @@ bool CameraDevice::release()
 {
     tout << "Release camera...\n";
 
-    if(m_info->GetModel() == "fake camera"){
+    if(std::string(m_info->GetModel()) == "fake camera"){
         m_device_handle = 0;
         return true;
     }
@@ -353,13 +356,13 @@ void CameraDevice::capture_image() const
     tout << "Capture image...\n";
     tout << "Shutter down\n";
     
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Down);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(35ms);
     tout << "Shutter up\n";
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam_Up);
 }
 
@@ -379,14 +382,14 @@ void CameraDevice::s1_shooting() const
     prop.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_S1);
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Locked);
     prop.SetValueType(SDK::CrDataType::CrDataType_UInt16);
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SetDeviceProperty(m_device_handle, &prop);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(1s);
     tout << "Shutter Half Press up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SetDeviceProperty(m_device_handle, &prop);
 }
 
@@ -406,26 +409,26 @@ void CameraDevice::af_shutter() const
     prop.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_S1);
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Locked);
     prop.SetValueType(SDK::CrDataType::CrDataType_UInt16);
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SetDeviceProperty(m_device_handle, &prop);
 
     // Wait, then send shutter down
     std::this_thread::sleep_for(500ms);
     tout << "Shutter down\n";
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Down);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(35ms);
     tout << "Shutter up\n";
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SendCommand(m_device_handle, SDK::CrCommandId::CrCommandId_Release, SDK::CrCommandParam::CrCommandParam_Up);
 
     // Wait, then send shutter up
     std::this_thread::sleep_for(1s);
     tout << "Shutter Half Press up\n";
     prop.SetCurrentValue(SDK::CrLockIndicator::CrLockIndicator_Unlocked);
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
         SDK::SetDeviceProperty(m_device_handle, &prop);
 }
 
@@ -439,7 +442,7 @@ void CameraDevice::continuous_shooting()
         priority.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_PriorityKeySettings);
         priority.SetCurrentValue(SDK::CrPriorityKeySettings::CrPriorityKey_PCRemote);
         priority.SetValueType(SDK::CrDataType::CrDataType_UInt32Array);
-        if(m_info->GetModel() != "fake camera")
+        if(std::string(m_info->GetModel()) != "fake camera")
         {
             auto err_priority = SDK::SetDeviceProperty(m_device_handle, &priority);
             if (CR_FAILED(err_priority)) {
@@ -449,7 +452,7 @@ void CameraDevice::continuous_shooting()
         }
         
         std::this_thread::sleep_for(500ms);
-        if(m_info->GetModel() != "fake camera")
+        if(std::string(m_info->GetModel()) != "fake camera")
             get_position_key_setting();
     }
 
@@ -459,7 +462,7 @@ void CameraDevice::continuous_shooting()
         tout << "Still Capture Mode setting is not supported.\n";
         return;
     }
-    if(m_info->GetModel() != "fake camera")
+    if(std::string(m_info->GetModel()) != "fake camera")
     {
         // no longer take the actual steps
         tout << "Still Capture Mode setting SUCCESS\n";
@@ -517,7 +520,7 @@ void CameraDevice::continuous_shooting()
 
 void CameraDevice::get_aperture()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << format_f_number(0xFFFE) << '\n';
         return;
@@ -529,7 +532,7 @@ void CameraDevice::get_aperture()
 
 void CameraDevice::get_iso()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "ISO: " << format_iso_sensitivity(0xFFFFFF) << '\n';
         return;
@@ -541,7 +544,7 @@ void CameraDevice::get_iso()
 
 void CameraDevice::get_shutter_speed()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Shutter Speed: " << format_shutter_speed(0xFFFFFFFF) << '\n';
         return;
@@ -553,7 +556,7 @@ void CameraDevice::get_shutter_speed()
 
 bool CameraDevice::get_extended_shutter_speed()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Extended Shutter Speed is not supported.\n";
         return true;
@@ -570,7 +573,7 @@ bool CameraDevice::get_extended_shutter_speed()
 
 void CameraDevice::get_position_key_setting()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Position Key Setting: Unknown\n";
         return;
@@ -582,7 +585,7 @@ void CameraDevice::get_position_key_setting()
 
 void CameraDevice::get_exposure_program_mode()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Exposure Program Mode: " << format_exposure_program_mode(0x00008000) << '\n';
         return;
@@ -594,7 +597,7 @@ void CameraDevice::get_exposure_program_mode()
 
 void CameraDevice::get_still_capture_mode()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Still Capture Mode: Enabled\n";
         return;
@@ -606,7 +609,7 @@ void CameraDevice::get_still_capture_mode()
 
 void CameraDevice::get_focus_mode()
 {
-    if(m_info->GetModel() == "fake camera")
+    if(std::string(m_info->GetModel()) == "fake camera")
     {
         tout << "Focus Mode: " << format_focus_mode(0x0001) << '\n';
         return;
@@ -618,6 +621,12 @@ void CameraDevice::get_focus_mode()
 
 void CameraDevice::get_focus_area()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Focus Area: " << format_focus_area(0x0000) << '\n';
+        return;
+    }
+
     load_properties();
     tout << "Focus Area: " << format_focus_area(m_prop.focus_area.current) << '\n';
 }
@@ -625,6 +634,11 @@ void CameraDevice::get_focus_area()
 void CameraDevice::get_live_view_only()
 {
     tout << "GetLiveView...\n";
+
+    if(std::string(m_info->GetModel()) == "fake camera"){
+        tout << "GetLiveView FAILED\n";
+        return;
+    }
 
     CrInt32 num = 0;
     SDK::CrLiveViewProperty* property = nullptr;
@@ -735,6 +749,11 @@ void CameraDevice::get_live_view_only()
 void CameraDevice::get_live_view_and_OSD()
 {
     tout << "GetLiveView...\n";
+
+    if(std::string(m_info->GetModel()) == "fake camera"){
+        tout << "GetLiveView FAILED\n";
+        return;
+    }
 
     CrInt32u isLVEnb = 0;
     SDK::GetDeviceSetting(m_device_handle, SDK::Setting_Key_EnableLiveView, &isLVEnb);
@@ -1022,6 +1041,12 @@ void CameraDevice::get_live_view_and_OSD()
 
 void CameraDevice::get_live_view()
 {
+
+    if(std::string(m_info->GetModel()) == "fake camera"){
+        tout << "GetLiveView FAILED\n";
+        return;
+    }
+
     // check OSD gettable status
     std::int32_t nprop = 0;
     SDK::CrDeviceProperty* prop_list = nullptr;
@@ -1073,6 +1098,11 @@ void CameraDevice::get_live_view()
 
 void CameraDevice::get_osd_image()
 {
+    if(std::string(m_info->GetModel()) == "fake camera"){
+        tout << "Get OSD Image is not supported.\n";
+        return;
+    }
+
     // check OSD gettable status
     std::int32_t nprop = 0;
     SDK::CrDeviceProperty* prop_list = nullptr;
@@ -1169,12 +1199,25 @@ void CameraDevice::get_osd_image()
 
 void CameraDevice::get_live_view_image_quality()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Live View Image Quality: low\n";
+        return;
+    }
+
     load_properties();
     tout << "Live View Image Quality: " << format_live_view_image_quality(m_prop.live_view_image_quality.current) << '\n';
 }
 
 void CameraDevice::get_select_media_format()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Media SLOT1 Full Format Enable Status: " << format_media_slotx_format_enable_status(0x00) << std::endl;
+        tout << "Media SLOT2 Full Format Enable Status: " << format_media_slotx_format_enable_status(0x00) << std::endl;
+        return;
+    }
+
     load_properties();
     tout << "Media SLOT1 Full Format Enable Status: " << format_media_slotx_format_enable_status(m_prop.media_slot1_full_format_enable_status.current) << std::endl;
     tout << "Media SLOT2 Full Format Enable Status: " << format_media_slotx_format_enable_status(m_prop.media_slot2_full_format_enable_status.current) << std::endl;
@@ -1187,12 +1230,27 @@ void CameraDevice::get_select_media_format()
 
 void CameraDevice::get_white_balance()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "White Balance: " << format_white_balance(0x0011) << '\n';
+        return;
+    }
+
     load_properties();
     tout << "White Balance: " << format_white_balance(m_prop.white_balance.current) << '\n';
 }
 
 bool CameraDevice::get_custom_wb()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "CustomWB Capture Standby Operation: " << "null" << '\n';
+        tout << "CustomWB Capture Standby CancelOperation: " << "null" << '\n';
+        tout << "CustomWB Capture Operation: " << "null" << '\n';
+        tout << "CustomWB Capture Execution State: " << "null" << '\n';
+        return false;
+    }
+
     bool state = false;
     load_properties();
     tout << "CustomWB Capture Standby Operation: " << format_customwb_capture_standby(m_prop.customwb_capture_standby.current) << '\n';
@@ -1207,6 +1265,8 @@ bool CameraDevice::get_custom_wb()
 
 void CameraDevice::get_zoom_operation()
 {
+    
+    
     load_properties();
     tout << "Zoom Operation Status: " << format_zoom_operation_status(m_prop.zoom_operation_status.current) << '\n';
     if (m_prop.zoom_setting_type.current > 0) {
@@ -1277,6 +1337,12 @@ void CameraDevice::get_remocon_zoom_speed_type()
 
 bool CameraDevice::get_aps_c_or_full_switching_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "APS-C/FULL Switchign Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (m_prop.aps_c_of_full_switching_setting.current < SDK::CrAPS_C_or_Full_SwitchingSetting::CrAPS_C_or_Full_SwitchingSetting_Full)
     {
@@ -1290,6 +1356,12 @@ bool CameraDevice::get_aps_c_or_full_switching_setting()
 
 bool CameraDevice::get_camera_setting_saveread_state()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "download/upload Camera-Setting file is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.camera_setting_save_read_state.writable) {
         tout << "download/upload Camera-Setting file is not supported\n";
@@ -1305,6 +1377,12 @@ bool CameraDevice::get_camera_setting_saveread_state()
 
 bool CameraDevice::get_playback_media()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Playback Media is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.playback_media.writable) {
         tout << "Playback Media is not supported\n";
@@ -1317,6 +1395,12 @@ bool CameraDevice::get_playback_media()
 
 bool CameraDevice::get_gain_base_sensitivity()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Base Sensitivity is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.gain_base_sensitivity.writable) {
         tout << "Gain Base Sensitivity is not supported\n";
@@ -1328,6 +1412,12 @@ bool CameraDevice::get_gain_base_sensitivity()
 
 bool CameraDevice::get_gain_base_iso_sensitivity()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Base ISO Sensitivity is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.gain_base_iso_sensitivity.writable) {
         tout << "Gain Base ISO Sensitivity is not supported \n";
@@ -1339,6 +1429,12 @@ bool CameraDevice::get_gain_base_iso_sensitivity()
 
 bool CameraDevice::get_monitor_lut_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Monitor LUT Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.monitor_lut_setting.writable) {
         tout << "Monitor LUT Setting is not supported \n";
@@ -1350,6 +1446,12 @@ bool CameraDevice::get_monitor_lut_setting()
 
 bool CameraDevice::get_exposure_index()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Exposure Index is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.exposure_index.writable) {
         tout << "Exposure Index is not supported \n";
@@ -1361,6 +1463,12 @@ bool CameraDevice::get_exposure_index()
 
 bool CameraDevice::get_baselook_value()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "BaseLook Value is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.baselook_value.writable) {
         tout << "BaseLook Value is not supported \n";
@@ -1392,6 +1500,12 @@ bool CameraDevice::get_baselook_value()
 
 bool CameraDevice::get_iris_mode_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Iris Mode Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.iris_mode_setting.writable) {
         tout << "Iris Mode Setting is not supported \n";
@@ -1403,6 +1517,12 @@ bool CameraDevice::get_iris_mode_setting()
 
 bool CameraDevice::get_shutter_mode_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Shutter Mode Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.shutter_mode_setting.writable) {
         tout << "Shutter Mode Setting is not supported \n";
@@ -1414,6 +1534,12 @@ bool CameraDevice::get_shutter_mode_setting()
 
 void CameraDevice::get_iso_current_sensitivity()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "ISO Current Sensitivity is not supported\n";
+        return;
+    }
+
     load_properties();
     if (m_prop.iso_current_sensitivity.current == 0) {
         tout << "ISO Current Sensitivity is not supported. \n";
@@ -1424,6 +1550,12 @@ void CameraDevice::get_iso_current_sensitivity()
 
 bool CameraDevice::get_exposure_control_type()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Exposure Control Type is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.exposure_control_type.writable) {
         tout << "Exposure Control Type is not supported.\n";
@@ -1435,6 +1567,12 @@ bool CameraDevice::get_exposure_control_type()
 
 bool CameraDevice::get_gain_control_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Control Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.gain_control_setting.writable) {
         tout << "Gain Control Setting is not supported.\n";
@@ -1446,6 +1584,12 @@ bool CameraDevice::get_gain_control_setting()
 
 bool CameraDevice::get_recording_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Recording Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.recording_setting.writable) {
         tout << "Recording Setting is not supported.\n";
@@ -1457,6 +1601,12 @@ bool CameraDevice::get_recording_setting()
 
 bool CameraDevice::get_gain_db_value()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain DB Value is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.gain_db_value.writable) {
         tout << "Gain dB Value is not supported.\n";
@@ -1468,6 +1618,12 @@ bool CameraDevice::get_gain_db_value()
 
 bool CameraDevice::get_shutter_speed_value()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Shutter Speed Value is not supported\n";
+        return false;
+    }
+    
     load_properties();
     if (-1 == m_prop.shutter_speed_value.writable) {
         tout << "Shutter Speed Value is not supported.\n";
@@ -1479,6 +1635,12 @@ bool CameraDevice::get_shutter_speed_value()
 
 bool CameraDevice::get_white_balance_tint()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "White Balance Tint is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.white_balance_tint.writable)
     {
@@ -1498,6 +1660,15 @@ bool CameraDevice::get_white_balance_tint()
 
 void CameraDevice::get_media_slot_status()
 {
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Media SLOT1 Status is not supported.\n";
+        tout << "Media SLOT2 Status is not supported.\n";
+        tout << "Media SLOT3 Status is not supported.\n";
+        return;
+    }
+
     load_properties();
 
     // SLOT1
@@ -1539,6 +1710,12 @@ void CameraDevice::get_media_slot_status()
 
 bool CameraDevice::get_movie_rec_button_toggle_enable_status()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Movie Rec Button(Toggle) is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (m_prop.movie_rec_button_toggle_enable_status.writable == -1)
     {
@@ -1551,6 +1728,12 @@ bool CameraDevice::get_movie_rec_button_toggle_enable_status()
 
 bool CameraDevice::get_focus_bracket_shot_num()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Focus Bracket Shot Number is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.focus_bracket_shot_num.writable)
     {
@@ -1565,6 +1748,12 @@ bool CameraDevice::get_focus_bracket_shot_num()
 
 bool CameraDevice::get_focus_bracket_focus_range()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Focus Bracket Focus Range is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.focus_bracket_focus_range.writable)
     {
@@ -1579,6 +1768,12 @@ bool CameraDevice::get_focus_bracket_focus_range()
 
 bool CameraDevice::get_movie_image_stabilization_steady_shot()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Image Stabilization Steady Shot(Movie) is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.movie_image_stabilization_steady_shot.writable) {
         tout << "Image Stabilization Steady Shot(Movie) is not supported.\n";
@@ -1590,6 +1785,12 @@ bool CameraDevice::get_movie_image_stabilization_steady_shot()
 
 bool CameraDevice::get_image_stabilization_steady_shot()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Image Stabilization Steady SHot(Still) is not supported\n";
+        return false;
+    }
+    
     load_properties();
     if (-1 == m_prop.image_stabilization_steady_shot.writable) {
         tout << "Image Stabilization Steady Shot(Still) is not supported.\n";
@@ -1601,6 +1802,12 @@ bool CameraDevice::get_image_stabilization_steady_shot()
 
 bool CameraDevice::get_silent_mode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Silent Mode is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.silent_mode.writable) {
         tout << "Silent Mode is not supported.\n";
@@ -1612,6 +1819,12 @@ bool CameraDevice::get_silent_mode()
 
 bool CameraDevice::get_silent_mode_aperture_drive_in_af()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Silent Mode Aperture Drive in AF is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.silent_mode_aperture_drive_in_af.writable) {
         tout << "Silent Mode Aperture Drive in AF is not supported.\n";
@@ -1623,6 +1836,12 @@ bool CameraDevice::get_silent_mode_aperture_drive_in_af()
 
 bool CameraDevice::get_silent_mode_shutter_when_power_off()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Silent Mode Shutter When Power OFF is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.silent_mode_shutter_when_power_off.writable) {
         tout << "Silent Mode Shutter When Power OFF is not supported.\n";
@@ -1634,6 +1853,12 @@ bool CameraDevice::get_silent_mode_shutter_when_power_off()
 
 bool CameraDevice::get_silent_mode_auto_pixel_mapping()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Silent Mode Auto Pixel Mapping is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.silent_mode_auto_pixel_mapping.writable) {
         tout << "Silent Mode Auto Pixel Mapping is not supported.\n";
@@ -1645,6 +1870,12 @@ bool CameraDevice::get_silent_mode_auto_pixel_mapping()
 
 bool CameraDevice::get_shutter_type()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Shutter Type is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.shutter_type.writable)
     {
@@ -1657,6 +1888,12 @@ bool CameraDevice::get_shutter_type()
 
 bool CameraDevice::get_movie_shooting_mode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Movie Shooting Mode is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.movie_shooting_mode.writable)
     {
@@ -1669,6 +1906,12 @@ bool CameraDevice::get_movie_shooting_mode()
 
 bool CameraDevice::get_custom_wb_size_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Custom WB Size Setting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.customwb_size_setting.writable) {
         tout << "Custom WB Size Setting is not supported.\n";
@@ -1680,6 +1923,12 @@ bool CameraDevice::get_custom_wb_size_setting()
 
 bool CameraDevice::get_time_shift_shooting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "TimeShift Shooting is not supported\n";
+        return false;
+    }
+
     load_properties();
     if (-1 == m_prop.time_shift_shooting.writable) {
         tout << "TimeShift Shooting is not supported.\n";
@@ -1691,6 +1940,12 @@ bool CameraDevice::get_time_shift_shooting()
 
 void CameraDevice::set_aperture()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Aperture is not writable\n";
+        return;
+    }
+    
     if (1 != m_prop.f_number.writable) {
         // Not a settable property
         tout << "Aperture is not writable\n";
@@ -1737,6 +1992,12 @@ void CameraDevice::set_aperture()
 
 void CameraDevice::set_iso()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "ISO is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.iso_sensitivity.writable) {
         // Not a settable property
         tout << "ISO is not writable\n";
@@ -1808,6 +2069,12 @@ bool CameraDevice::set_save_info() const
 
 void CameraDevice::set_shutter_speed()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Shutter Speed is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.shutter_speed.writable) {
         // Not a settable property
         tout << "Shutter Speed is not writable\n";
@@ -1854,6 +2121,12 @@ void CameraDevice::set_shutter_speed()
 
 void CameraDevice::set_extended_shutter_speed()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Extended Shutter Speed is not writable\n";
+        return;
+    }
+
     if (false == get_extended_shutter_speed())
         return;
 
@@ -1903,6 +2176,12 @@ void CameraDevice::set_extended_shutter_speed()
 
 void CameraDevice::set_position_key_setting()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Position Key Setting is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.position_key_setting.writable) {
         // Not a settable property
         tout << "Position Key Setting is not writable\n";
@@ -1949,6 +2228,12 @@ void CameraDevice::set_position_key_setting()
 
 void CameraDevice::set_exposure_program_mode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Exposure Program Mode is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.exposure_program_mode.writable) {
         // Not a settable property
         tout << "Exposure Program Mode is not writable\n";
@@ -1995,6 +2280,12 @@ void CameraDevice::set_exposure_program_mode()
 
 void CameraDevice::set_still_capture_mode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Still Capture Mode is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.still_capture_mode.writable) {
         // Not a settable property
         tout << "Still Capture Mode is not writable\n";
@@ -2041,6 +2332,12 @@ void CameraDevice::set_still_capture_mode()
 
 void CameraDevice::set_focus_mode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Focus Mode is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.focus_mode.writable) {
         // Not a settable property
         tout << "Focus Mode is not writable\n";
@@ -2087,6 +2384,12 @@ void CameraDevice::set_focus_mode()
 
 void CameraDevice::set_focus_area()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Focus Area is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.focus_area.writable) {
         // Not a settable property
         tout << "Focus Area is not writable\n";
@@ -2133,6 +2436,12 @@ void CameraDevice::set_focus_area()
 
 void CameraDevice::set_live_view_image_quality()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Live View Image Quality is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.live_view_image_quality.writable) {
         // Not a settable property
         tout << "Live View Image Quality is not writable\n";
@@ -2179,6 +2488,12 @@ void CameraDevice::set_live_view_image_quality()
 
 void CameraDevice::set_white_balance()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "White Balance is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.white_balance.writable) {
         // Not a settable property
         tout << "White Balance is not writable\n";
@@ -2225,6 +2540,11 @@ void CameraDevice::set_white_balance()
 
 void CameraDevice::execute_lock_property(CrInt16u code)
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return;
+    }
+
     load_properties();
 
     text input;
@@ -2278,6 +2598,12 @@ void CameraDevice::execute_lock_property(CrInt16u code)
 
 void CameraDevice::get_af_area_position()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Failed to get AF Area Position [LiveViewProperties]\n";
+        return;
+    }
+
     CrInt32 num = 0;
     SDK::CrLiveViewProperty* lvProperty = nullptr;
     CrInt32u getCode = SDK::CrLiveViewPropertyCode::CrLiveViewProperty_AF_Area_Position;
@@ -2328,6 +2654,10 @@ void CameraDevice::get_af_area_position()
 
 void CameraDevice::set_af_area_position()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return;
+    }    
     load_properties();
 
     if (1 == m_prop.position_key_setting.writable) {
@@ -2433,6 +2763,11 @@ void CameraDevice::set_af_area_position()
 
 void CameraDevice::set_select_media_format()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Slot1 and Slot2 can not format\n";
+        return;
+    }
     bool validQuickFormat = false;
     SDK::CrCommandId ptpFormatType = SDK::CrCommandId::CrCommandId_MediaFormat;
 
@@ -2572,6 +2907,10 @@ void CameraDevice::set_select_media_format()
 
 void CameraDevice::execute_movie_rec()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return;
+    }
     load_properties();
 
     text input;
@@ -2636,10 +2975,16 @@ void CameraDevice::execute_movie_rec()
 
 void CameraDevice::set_custom_wb()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Custom WB Capture is Not Supported.\n";
+        return;
+    }
+
     load_properties();
     if (-1 == m_prop.customwb_capture_execution_state.writable) {
         tout << "Custom WB Capture is Not Supported.\n";
-        return ;
+        return;
     }
     if (1 == m_prop.position_key_setting.writable) {
         // Set, PriorityKeySettings property
@@ -2746,6 +3091,10 @@ void CameraDevice::set_custom_wb()
 
 void CameraDevice::set_zoom_operation()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return;
+    }
     text input;
     tout << std::endl << "Operate the zoom ? (y/n): ";
     std::getline(tin, input);
@@ -2832,6 +3181,12 @@ void CameraDevice::set_zoom_operation()
 
 void CameraDevice::set_remocon_zoom_speed_type()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Zoom Speed is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.remocon_zoom_speed_type.writable) {
         // Not a settable property
         tout << "Zoom speed type is not writable\n";
@@ -2879,6 +3234,11 @@ void CameraDevice::set_remocon_zoom_speed_type()
 
 bool CameraDevice::set_drive_mode(CrInt64u Value)
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return false;
+    }
+
     SDK::CrDeviceProperty mode;
     mode.SetCode(SDK::CrDevicePropertyCode::CrDeviceProperty_DriveMode);
     mode.SetCurrentValue(Value);
@@ -2894,6 +3254,12 @@ bool CameraDevice::set_drive_mode(CrInt64u Value)
 
 void CameraDevice::execute_camera_setting_reset()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Camera Setting Reset not executable.\n";
+        return;
+    }
+
     load_properties();
     if (SDK::CrCameraSettingsResetEnableStatus::CrCameraSettingsReset_Enable == m_prop.camera_setting_reset_enable_status.current) {
         tout << "Camera Setting Reset Enable Status: Enable \n";
@@ -2923,6 +3289,12 @@ void CameraDevice::execute_camera_setting_reset()
 
 void CameraDevice::set_playback_media()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Playback Media is not writable\n";
+        return;
+    }
+
     if (false == get_playback_media())
         return;
 
@@ -2968,6 +3340,12 @@ void CameraDevice::set_gain_base_sensitivity()
     if (false == get_gain_base_sensitivity())
         return;
 
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Base Sensitivity is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.gain_base_sensitivity.writable) {
         tout << "Gain Base Sensitivity is not writable\n";
         return;
@@ -3011,6 +3389,12 @@ void CameraDevice::set_gain_base_iso_sensitivity()
 {
     if (false == get_gain_base_iso_sensitivity())
         return;
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Base ISO Sensitivity is not writable\n";
+        return;
+    }
 
     if (1 != m_prop.gain_base_iso_sensitivity.writable) {
         // Not a settable property
@@ -3057,6 +3441,12 @@ void CameraDevice::set_monitor_lut_setting()
     if (false == get_monitor_lut_setting())
         return;
 
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Monitor LUT Setting is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.monitor_lut_setting.writable) {
         tout << "Monitor LUT Setting is not writable\n";
         return;
@@ -3099,6 +3489,12 @@ void CameraDevice::set_exposure_index()
 {
     if (false == get_exposure_index())
         return;
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Exposure Index is not writable\n";
+        return;
+    }
 
     if (1 != m_prop.exposure_index.writable) {
         tout << "Exposure Index is not writable\n";
@@ -3145,6 +3541,12 @@ void CameraDevice::set_baselook_value()
 {
     if (false == get_baselook_value())
         return;
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "BaseLook Value is not writable\n";
+        return;
+    }
 
     if (1 != m_prop.baselook_value.writable) {
         tout << "BaseLook Value is not writable\n";
@@ -3215,6 +3617,12 @@ void CameraDevice::set_iris_mode_setting()
     if (false == get_iris_mode_setting())
         return;
 
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Iris Mode Setting is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.iris_mode_setting.writable) {
         // Not a settable property
         tout << "Iris Mode Setting is not writable\n";
@@ -3259,6 +3667,12 @@ void CameraDevice::set_shutter_mode_setting()
 {
     if (false == get_shutter_mode_setting())
         return;
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Shutter Mode Setting is not writable\n";
+        return;
+    }
 
     if (1 != m_prop.shutter_mode_setting.writable) {
         // Not a settable property
@@ -3305,6 +3719,12 @@ void CameraDevice::set_exposure_control_type()
     if (false == get_exposure_control_type())
         return;
 
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Exposure Control Type is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.exposure_control_type.writable) {
         // Not a settable property
         tout << "Exposure Control Type is not writable\n";
@@ -3349,6 +3769,12 @@ void CameraDevice::set_recording_setting()
 {
     if (false == get_recording_setting())
         return;
+
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Recording Setting is not writable\n";
+        return;
+    }
 
     if (1 != m_prop.recording_setting.writable) {
         // Not a settable property
@@ -3399,6 +3825,12 @@ void CameraDevice::set_gain_control_setting()
     if (false == get_gain_control_setting())
         return;
 
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "Gain Control Setting is not writable\n";
+        return;
+    }
+
     if (1 != m_prop.gain_control_setting.writable) {
         // Not a settable property
         tout << "Gain Control Setting is not writable\n";
@@ -3441,6 +3873,12 @@ void CameraDevice::set_gain_control_setting()
 
 void CameraDevice::set_dispmode()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        tout << "DISP Mode Setting is not supported\n";
+        return;
+    }
+
     load_properties();
     if (-1 == m_prop.dispmode_candidate.writable||
         -1 == m_prop.dispmode_setting.writable||
@@ -4539,6 +4977,11 @@ void CameraDevice::execute_APS_C_or_Full()
 
 void CameraDevice::execute_movie_rec_toggle()
 {
+    if(std::string(m_info->GetModel()) == "fake camera")
+    {
+        return;
+    }
+
     if (false == get_movie_rec_button_toggle_enable_status()) {
         return;
     }
