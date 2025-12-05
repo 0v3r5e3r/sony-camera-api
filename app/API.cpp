@@ -199,7 +199,7 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
         pCam->GetConnectionTypeName(),
         pCam->GetAdaptorName(),
         pCam->GetPairingNecessity(),
-        pCam->GetSSHsupport()
+        (pCam->GetSSHsupport() == SDK::CrSSHsupportValue::CrSSHsupport_ON)
     );
     
     // Create camera device and connect
