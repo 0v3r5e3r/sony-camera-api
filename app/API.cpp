@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include <iostream>
+#include <cstdlib>
 
 using json = nlohmann::json;
 
@@ -121,6 +122,14 @@ void API::enable_fake_camera(void)
     m_fakecam = true;
 }
 
+bool is_ip_online(const std::string& ip)
+{
+    std::string cmd = "ping -c 1 " + ip + " -w 1 1>/dev/null 2>/dev/null";
+
+    int result = system(cmd.c_str());
+    return (result == 0);
+}
+
 std::string API::handle_connect_camera(const std::string& ip, const std::string& password)
 {
     std::lock_guard<std::mutex> lock(m_cameras_mutex);
@@ -185,6 +194,12 @@ std::string API::handle_connect_camera(const std::string& ip, const std::string&
     SCRSDK::CrCameraDeviceModelList model = SCRSDK::CrCameraDeviceModelList::CrCameraDeviceModel_HXR_NX800;
     CrInt32u sshSupport = 0; // No SSH
     
+    if(!is_ip_online(ip))
+    {
+        std::cerr << "Host at " << ip << " appears to be offline." << std::endl;
+        return "";
+    }
+
     auto err = SCRSDK::CreateCameraObjectInfoEthernetConnection(&pCam, model, ipAddr, macAddr, sshSupport);
     if (err != 0 || pCam == nullptr) {
         std::cerr << "Failed to create camera object for IP: " << ip << std::endl;
